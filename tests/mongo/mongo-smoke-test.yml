@@ -1,0 +1,13 @@
+platform: linux
+
+inputs:
+    - name: aws-ref-arch
+
+run:
+  path: sh
+  dir: aws-ref-arch/tests/mongo/spec
+  args:
+  - -exc
+  - |
+    bundle install
+    bundle exec rake -t

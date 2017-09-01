@@ -1,0 +1,28 @@
+#!/bin/bash
+#copy the interface configuration
+cp /tmp/ifcfg-eth1 /etc/sysconfig/network-scripts/ifcfg-eth1 
+
+# attache the ENI with static ip
+aws ec2 attach-network-interface --region {{ region }} --instance-id `curl http://169.254.169.254/latest/meta-data/instance-id` --network-interface-id {{ network_interface_id }} --device-index 1
+
+# wait for the ENI to be attached
+sleep 10
+
+# reload the interface configurations
+systemctl restart network > /tmp/eni-attach.log 2>&1
+
+# lets get our routing on!
+staticIp="{{ static_ip }}"
+firstThreeOctets=$(echo "${staticIp}" | cut -d"." -f1-3)
+
+# create new route table that routes all traffic on the segnment in/out to eth1 to/from the staticIp bound to that interface
+ip route add ${firstThreeOctets}.0/24 dev eth1 proto kernel scope link src ${staticIp} table 1
+
+# add route in new table to route traffic out the gateway for destinations not in the segment
+ip route add default via ${firstThreeOctets}.1 dev eth1 table 1
+
+# add rule that traffic to the static ip will use the new route table and not the main table
+ip rule add from ${staticIp} lookup 1
+
+# flush the route cache
+ip route flush cache

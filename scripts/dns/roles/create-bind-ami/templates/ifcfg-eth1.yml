@@ -1,0 +1,8 @@
+DEVICE="eth1"
+BOOTPROTO=none
+ONBOOT="yes"
+TYPE="Ethernet"
+USERCTL="yes"
+PEERDNS="yes"
+IPV6INIT="no"
+IPADDR={{ static_ip }}

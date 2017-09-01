@@ -1,0 +1,11 @@
+# servers must have the following properties set:
+# subnet_id: id of the target subnet this server will be created within
+# region: amazon region of the subnet
+# hostname: a known hostname with A record in the digital.hbc.com name servers
+# static_ip: known ip associated with the hostname
+# zone:  availability zone
+#
+[bindservers]
+server1  static_ip=172.26.88.5 subnet_id=subnet-40277925 region=us-east-1 hostname=hd1pamz01lx zone=us-east-1a
+server2 static_ip=172.26.93.5 subnet_id=subnet-6773b73d region=us-east-1 hostname=hd1pamz02lx zone=us-east-1d
+

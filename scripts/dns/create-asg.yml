@@ -1,0 +1,9 @@
+ - hosts: bindservers
+   connection: local
+   gather_facts: false
+   user: root
+   vars:
+     local_home: "{{ lookup('env','HOME') }}"
+     local_user: "{{ lookup('env','USER') }}"
+   roles:
+    - create-asg

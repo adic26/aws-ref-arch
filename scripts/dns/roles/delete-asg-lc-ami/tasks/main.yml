@@ -1,0 +1,29 @@
+---
+  # delete the autoscale group, launch configuration and AMI for a bind server
+  - name: Delete auto scale group and any existing instances
+    ec2_asg:
+      state: absent
+      name: "BIND-SERVER-{{ static_ip }}"
+      region: "{{ region }}"
+      suspend_processes: Terminate
+
+  - name: Delete launch configuration
+    ec2_lc:
+      name: "BIND-SERVER-{{ static_ip }}"
+      state: absent
+      region: "{{ region }}"
+
+  - name: Find target ami
+    ec2_ami_find:
+      owner: self
+      name: "BIND-SERVER-{{ static_ip }}*"
+      region: "{{ region }}"
+      no_result_action: fail
+    register: ami_find
+
+  - name: Delete AMI
+    ec2_ami:
+      state: absent
+      image_id: "{{ ami_find.results[0].ami_id }}"
+      delete_snapshot: True
+      region: "{{ region }}"

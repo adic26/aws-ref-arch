@@ -1,0 +1,253 @@
+---
+  - name: "Create a new security group"
+    ec2_group:
+      name: "{{ ec2_security_group_name }}"
+      description: "Security Group for a BIND DNS secondary server"
+      region: "{{ region }}"
+      vpc_id: "{{ ec2_vpc_id }}"
+      rules:
+        - proto: "tcp"
+          from_port: 22
+          to_port: 22
+          cidr_ip: "0.0.0.0/0"
+        - proto: "tcp"
+          from_port: 53
+          to_port: 53
+          cidr_ip: "0.0.0.0/0"
+        - proto: "udp"
+          from_port: 53
+          to_port: 53
+          cidr_ip: "0.0.0.0/0"
+        - proto: "tcp"
+          from_port: 80
+          to_port: 80
+          cidr_ip: "0.0.0.0/0"
+        - proto: "tcp"
+          from_port: 443
+          to_port: 443
+          cidr_ip: "0.0.0.0/0"
+      rules_egress:
+        - proto: "all"
+          cidr_ip: "0.0.0.0/0"
+    register: securityGroup
+
+  - name: Create an Elastic Network Interface
+    ec2_eni:
+      private_ip_address: "{{ static_ip }}"
+      subnet_id: "{{ subnet_id }}"
+      state: present
+      region: "{{ region }}"
+      delete_on_termination: false
+      force_detach: true
+      device_index: 0
+      security_groups: "{{ securityGroup.group_id }}"
+    register: eni
+
+  - name: Debug eni
+    debug: var=eni
+
+  - name: Checking if EC2 instance exists
+    ec2_remote_facts:
+      region: "{{ region }}"
+      filters:
+        private-ip-address: "{{ static_ip }}"
+    register: ec2_facts
+
+
+  - name: "Create the EC2 instance and attach the ENI with static IP"
+    ec2:
+      key_name: "{{ ec2_keypair_name }}"
+      instance_type: "{{ ec2_instance_type }}"
+      region: "{{ region }}"
+      image: "{{ ec2_image }}"
+      instance_profile_name: "{{ ec2_instance_profile }}"
+      wait: true
+      count: 1
+      network_interfaces: "{{ eni.interface.id }}"
+      instance_tags:
+        name: "bind-server-{{ static_ip }}"
+        banner: "all"
+        env: "all"
+    register: ec2instance
+    when: not ec2_facts.instances
+
+  - name: Add new EC2 to hosts group
+    local_action:
+      module: add_host
+      hostname: "{{ static_ip }}"
+      ansible_user: "ec2-user"
+      ansible_ssh_private_key_file: "{{ ec2_key_file }}"
+      user: ec2-user
+
+  - name: Wait for SSH to be available
+    wait_for:
+      host: "{{ static_ip }}"
+      port: 22
+      delay: 10
+      timeout: 600
+      state: started
+
+  - name: Set EC2 hostname
+    become: yes
+    become_user: root
+    command: hostnamectl set-hostname "{{ hostname }}"
+    delegate_to: "{{ static_ip }}"
+
+  - name: Install ntp and netcat
+    become: yes
+    become_user: root
+    yum: state=present name={{ item }}
+    with_items:
+      - ntp
+      - nc
+    delegate_to: "{{ static_ip }}"
+
+  - name: Download pip
+    become: yes
+    become_user: root
+    get_url: 
+      url="https://bootstrap.pypa.io/get-pip.py"
+      dest="/tmp/get-pip.py"
+    delegate_to:  "{{ static_ip }}"
+    register: awscli_download
+
+  - stat:
+      path: /tmp/get-pip.py
+    register: pip_download
+    delegate_to: "{{ static_ip }}"
+
+  - fail: msg="Failed to download get-pip.py"
+    when: pip_download.stat.exists == False
+
+  - name: Install pip
+    become: yes
+    become_user: root
+    command: python /tmp/get-pip.py
+    delegate_to:  "{{ static_ip }}"
+
+  - name: Install aws CLI
+    become: yes
+    become_user: root
+    shell: /bin/pip install awscli --upgrade
+    delegate_to:  "{{ static_ip }}"
+
+  # needed by the attach-eni.sh script
+  - set_fact:
+      network_interface_id: "{{ eni.interface.id }}"
+
+  - name: Copy eth1 interface config file so the system is aware of the device
+    become: yes
+    become_user: root
+    template:
+      src: ifcfg-eth1.yml
+      dest: /tmp/ifcfg-eth1
+      owner: root
+      group: root
+      mode: "u=rw,g=r,o=r"
+    delegate_to: "{{ static_ip }}"
+
+  - name: Copy the systemd unit execution script
+    become: yes
+    become_user: root
+    template:
+      src: attach-static-eni.yml
+      dest: /etc/attach-static-eni.sh
+      owner: root
+      group: root
+      mode: "u=rwx,g=r,o=r"
+    delegate_to: "{{ static_ip }}"
+
+  - name: Copy systemd unit file for a service that attaches the ENI a system boot
+    become: yes
+    become_user: root
+    template:
+      src: eni-attach-at-startup-service.yml
+      dest: /etc/systemd/system/eni-attach-at-startup.service
+      owner: root
+      group: root
+      mode: "u=rw,g=r,o=r"
+    delegate_to: "{{ static_ip }}"
+
+  - name: Enable the eni-attach-at-startup.service to run at boot
+    become: yes
+    become_user: root
+    command: systemctl enable eni-attach-at-startup.service
+    delegate_to: "{{ static_ip }}"
+
+  - name: Start the eni-attach-at-startup.service 
+    become: yes
+    become_user: root
+    command: systemctl start eni-attach-at-startup.service
+    delegate_to: "{{ static_ip }}"
+
+# add hd1pbk01lx to the host inventory
+  - local_action:
+      module: add_host
+      hostname: hd1pbk01lx.digital.hbc.com
+      ansible_user: "{{ local_user }}"
+      ansible_ssh_private_key_file: "{{ local_home }}/.ssh/id_rsa"
+  
+  - name: Copy EC2 pem certificate to the Ansible server
+    remote_user: "{{ local_user }}"
+    copy:
+      src: "{{ ec2_key_file }}"
+      dest: /tmp/ec2-cert
+    delegate_to: hd1pbk01lx.digital.hbc.com
+
+
+  - name: Initialize server for Satellite yum repo, OS patching, Monitoring and HBC digital AD ssh
+    remote_user: "{{ local_user }}"
+    shell: cd ~/playbooks && ansible-playbook -vv initial_setup.yml -i {{ hostname }}, --private-key=/tmp/ec2-cert -u ec2-user -s
+    become: yes
+    become_user: rbackup
+    delegate_to: hd1pbk01lx.digital.hbc.com
+    ignore_errors: yes
+
+  - name: Delete EC2 pem certificate
+    file:
+      path: /tmp/ec2-cert
+      state: absent
+    delegate_to: hd1pbk01lx.digital.hbc.com
+
+# Install and configure bind
+  - include: BindConfig.yml
+    tags: BindConfigUpdate
+    become: yes
+    become_user: root
+    delegate_to: "{{ static_ip }}"
+
+  - include: NSnotifyConfig.yml
+    become: yes
+    become_user: root
+    delegate_to: "{{ static_ip }}"
+
+  - set_fact:
+      ami_name: "BIND-SERVER-{{ static_ip }}-{{ lookup('pipe', 'date +%Y%m%d%H%M%SZ') }}"
+
+  - name: Ensure ec2 facts are retrieved
+    ec2_remote_facts:
+      region: "{{ region }}"
+      filters:
+        private-ip-address: "{{ static_ip }}"
+    register: ec2_facts
+    when: not ec2_facts.instances
+
+  - name: Debug ec2instance
+    debug: var=ec2_facts
+
+  - name: Create AMI from ec2 instance
+    ec2_ami:
+      region: "{{ region }}"
+      instance_id: "{{ ec2_facts.instances[0].id }}"
+      name: "{{ ami_name }}"
+      wait: yes
+    register: image
+
+  - name: Terminate instance
+    ec2:
+      state: absent
+      instance_ids: '{{ ec2instance.instance_ids }}'
+      region: "{{ region }}"
+
+
+

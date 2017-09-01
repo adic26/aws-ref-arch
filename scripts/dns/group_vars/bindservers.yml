@@ -1,0 +1,8 @@
+ec2_instance_type: "t2.micro"
+# use Red Hat for the satellite subscription and registration into digital AD
+ec2_image: "ami-9e2f0988"
+ec2_keypair_name: ansible-bind-server
+ec2_vpc_id: vpc-75584d13
+ec2_key_file: roles/create-bind-ami/files/ansible-bind-server.pem
+ec2_instance_profile: ec2-full-admin
+ec2_security_group_name: bind-secondary-server 

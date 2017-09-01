@@ -1,0 +1,57 @@
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "Stmt1495553716000",
+            "Effect": "Allow",
+            "Action": [
+                "iam:AddRoleToInstanceProfile",
+                "iam:CreateInstanceProfile",
+                "iam:CreatePolicy",
+                "iam:CreatePolicyVersion",
+                "iam:CreateRole",
+                "iam:GetInstanceProfile",
+                "iam:GetRole",
+                "iam:GetRolePolicy",
+                "iam:GetSSHPublicKey",
+                "iam:GetServerCertificate",
+                "iam:ListInstanceProfiles",
+                "iam:ListInstanceProfilesForRole",
+                "iam:ListPolicies",
+                "iam:ListPoliciesGrantingServiceAccess",
+                "iam:ListPolicyVersions",
+                "iam:ListRolePolicies",
+                "iam:ListRoles",
+                "iam:ListSSHPublicKeys",
+                "iam:ListServerCertificates",
+                "iam:ListSigningCertificates",
+                "iam:PutRolePolicy",
+                "iam:UpdateAccessKey",
+                "iam:UpdateAssumeRolePolicy",
+                "iam:UpdateSSHPublicKey",
+                "iam:UploadSSHPublicKey",
+                "iam:DeleteInstanceProfile",
+                "iam:DeletePolicy",
+                "iam:DeletePolicyVersion",
+                "iam:DeleteRole",
+                "iam:DeleteRolePolicy",
+                "iam:DetachRolePolicy",
+                "iam:ListAttachedRolePolicies",
+                "iam:RemoveRoleFromInstanceProfile",
+ 		"iam:PassRole"
+            ],
+            "Resource": [
+                "*"
+            ]
+        },
+        {
+            "Effect": "Deny",
+            "Action": [
+                "iam:DeleteRole"
+            ],
+            "Resource": [
+                "arn:aws:iam::*:role/Hbcd*"
+            ]
+        }
+    ]
+}

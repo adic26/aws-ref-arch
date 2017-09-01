@@ -1,0 +1,30 @@
+{
+  "variables": {
+    "aws_access_key": "",
+    "aws_secret_key": ""
+  },
+
+  "builders": [
+    {
+      "type": "amazon-ebs",
+      "access_key": "{{user `aws_access_key`}}",
+      "secret_key": "{{user `aws_secret_key`}}",
+      "region": "us-east-1",
+      "source_ami": "ami-ecfccb97",
+      "instance_type": "t2.micro",
+      "ssh_username": "ec2-user",
+
+      "ami_name": "concourse_worker_web_base",
+      "ssh_keypair_name": "rogue_squadron_shared",
+      "ssh_private_key_file": "./rogue_squadron_shared.pem",
+      "subnet_id": "subnet-1f359c33"
+    }
+  ],
+
+  "provisioners": [
+    {
+      "type": "shell",
+      "script": "provisioners/concourse_worker_web_base.sh"
+    }
+  ]
+}

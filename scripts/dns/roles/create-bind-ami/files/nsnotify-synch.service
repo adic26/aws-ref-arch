@@ -1,0 +1,11 @@
+[Unit]
+Description=Execute nsnotify daemon to liston on zone transfer NOTIFY messages and trigger a script to synch with Route53
+Requires=network-online.target
+After=network-online.target
+
+[Service]
+ExecStart=/usr/local/bin/nsnotifyd -d -d -4 -a 127.0.0.1 -s 192.168.6.200 -p 53 /usr/local/bin/nsnotify-synch.sh digital.hbc.com dev.digital.hbc.com ad.digital.hbc.com hbc-digital-1.cns.digital.hbc.com digital.local
+RestartSec=60
+
+[Install]
+WantedBy=multi-user.target

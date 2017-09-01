@@ -1,0 +1,46 @@
+---
+  - name: Pause for two minutes to ensure ami registers
+    pause: minutes=2
+
+  - name: Get group facts
+    tags: CreateASG
+    ec2_group_facts:
+      filters:
+        group-name: "{{ ec2_security_group_name }}"
+    register: bind_sg
+
+  - name: Find target ami
+    tags: CreateASG
+    ec2_ami_find:
+      owner: self
+      name: "BIND-SERVER-{{ static_ip }}*"
+      region: "{{ region }}"
+      no_result_action: fail
+    register: ami_find
+
+  - name: Create Launch Config
+    tags: CreateASG
+    ec2_lc:
+      name: "BIND-SERVER-{{ static_ip }}"
+      image_id: "{{ ami_find.results[0].ami_id }}"
+      key_name: "{{ ec2_keypair_name }}"
+      region: "{{ region }}"
+      security_groups: "{{ bind_sg['security_groups'][0]['group_id'] }}"
+      instance_type: t2.micro
+      instance_profile_name: "{{ ec2_instance_profile }}"
+    register: launch_config
+
+  - name: Create ASG
+    tags: CreateASG
+    ec2_asg:
+      name: "BIND-SERVER-{{ static_ip }}"
+      launch_config_name: "BIND-SERVER-{{ static_ip }}"
+      health_check_period: 60
+      health_check_type: EC2
+      replace_all_instances: yes
+      min_size: 0
+      max_size: 1
+      desired_capacity: 1
+      availability_zones: "{{ zone }}"
+      vpc_zone_identifier: "{{ subnet_id }}"
+      region: "{{ region }}"

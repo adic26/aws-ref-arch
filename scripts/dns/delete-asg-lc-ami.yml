@@ -1,0 +1,5 @@
+- hosts: bindservers
+  connection: local  
+  gather_facts: false
+  roles:
+    - delete-asg-lc-ami

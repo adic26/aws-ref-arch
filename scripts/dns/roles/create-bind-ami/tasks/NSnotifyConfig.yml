@@ -1,0 +1,20 @@
+---
+  - name: Copy over the cli53 route 53 tool, nsnotify utility and synch script
+    copy:
+      src: nsnotify/
+      dest: /usr/local/bin/
+      mode: 0700
+
+  - name: Copy over the systemd nsnotify-synch.service unit file
+    copy:
+      src: nsnotify-synch.service
+      dest: /etc/systemd/system/
+      owner: root
+      group: root
+      mode: "u=rw,g=r,o=r"
+
+  - name: Enable the nsnotify-synch.service to be executed at boot
+    command: systemctl enable nsnotify-synch.service
+
+  - name: Start the nsnotify-synch.service
+    command: systemctl start nsnotify-synch.service

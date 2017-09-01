@@ -1,0 +1,10 @@
+[Unit]
+Description=Attach to this instance an existing Elastic Network Interface with know IP adress
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+ExecStart=/etc/attach-static-eni.sh
+
+[Install]
+WantedBy=multi-user.target

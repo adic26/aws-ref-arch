@@ -1,0 +1,19 @@
+version: '3'
+
+services:
+  concourse-worker:
+    image: concourse/concourse:3.4.1
+    privileged: true
+    command: worker
+    ports: 
+      - "7777:7777"
+      - "7788:7788"
+    volumes: ['./keys/worker:/concourse-keys', '/opt/docker/worker-state:/worker-state']
+    environment:
+      CONCOURSE_TSA_HOST: ${web_host}
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: ${aws_region}
+        awslogs-group: ${cloudwatch_log_group_name}
+        tag: concourse-worker

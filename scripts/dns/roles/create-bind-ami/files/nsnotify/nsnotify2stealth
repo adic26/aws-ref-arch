@@ -1,0 +1,18 @@
+#!/bin/sh
+(	zone=$1 serial=$2 master=${3:+@$3}
+	case $zone in
+	(.)	file=root ;;
+	(*)	file=$zone ;;
+	esac
+	[ -f $file ] && nsnotify -f $file $zone
+	if perl -e 'exit!(time - [stat shift]->[9] > 86400)' $file &&
+		! [ -f .once ]
+	then (
+		(	touch .once
+			nsnotify-liststealth .log
+			rm -f .once
+		) </dev/null 2>&1 |
+		logger -p daemon.notice -t nsnotify-liststealth &
+	) & fi
+) 2>&1 |
+logger -p daemon.notice -t nsnotify2stealth

@@ -1,0 +1,6 @@
+---
+repo-name: aws-ref-arch
+branch: master
+AWS_Region: us-east-1
+concourse-team: main
+concourse-url: http://rogue-squadron-concourse.hbccommon.private.hbc.com

@@ -1,0 +1,56 @@
+---
+- name: Provision an EC2 Instance
+  hosts: local
+  user: root
+  connection: local
+  gather_facts: False
+  tags: provisioning
+    
+  vars:
+    ec2_region: us-east-1
+    ec2_keypair: jumpbox
+    ec2_count: 1
+    ec2_tag_name: hd5pjmp01lx
+    ec2_security_group: "allow ssh"
+    ec2_image: ami-4ee5c635
+    ec2_ip: 172.26.93.20
+    ec2_instance_type: t2.small
+      
+  vars_prompt:
+    - name: aws_access_key_entry
+      prompt: "Enter AWS Access Key"
+      private: no
+        
+    - name: aws_secret_key_entry
+      prompt: "Enter AWS Secret Key"
+      private: no
+              
+      
+  tasks:
+    - name: Creating AWS jumpbox
+      local_action:
+          module: ec2
+          aws_access_key: "{{aws_access_key_entry}}"
+          aws_secret_key: "{{aws_secret_key_entry}}"
+          group: "{{ec2_security_group}}"
+          instance_type: "{{ec2_instance_type}}"
+          image: "{{ec2_image}}"
+          region: "{{ec2_region}}"
+          keypair: "{{ec2_keypair}}"
+          count: "{{ec2_count}}"
+          vpc_subnet_id: subnet-6773b73d
+          private_ip: "{{ec2_ip}}"
+          instance_tags: '{"Name":"{{ec2_tag_name}}"}'
+            
+    - name: Waiting for SSH to come up... This may take a while. 
+      local_action: wait_for
+                    host={{ec2_ip}}
+                    port=22
+                    state=started
+            
+    - name: Configuring hostname on EC2 instance. Be sure it already resolves or this will fail!  
+      command: ansible-playbook -i {{ ec2_tag_name }}, /home/rbackup/playbooks/initial_setup.yml
+      become: yes
+      become_user: rbackup
+      delegate_to: hd1pbk01lx
+      ignore_errors: yes

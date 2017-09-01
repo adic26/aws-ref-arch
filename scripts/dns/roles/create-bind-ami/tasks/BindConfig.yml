@@ -1,0 +1,67 @@
+---
+  - name: Test if BIND has been installed
+    command: yum list installed bind
+    register: bind_installed
+    ignore_errors: yes
+
+  - name: Install bind
+    yum: state=latest name=bind
+    when: bind_installed.stderr.find('No') != -1
+
+  - name: Install bind-utils
+    yum: state=latest name=bind-utils
+    when: bind_installed.stderr.find('No') != -1
+
+  - name: Always copy local named.conf
+    copy:
+      src: etc/named.conf
+      dest: /etc/named.conf
+      owner: root
+      group: root
+      mode: 0644
+
+  - name: Create /var/log/named directory
+    file:
+      path: /var/log/named
+      state: directory
+      owner: root
+      group: root
+      mode: 0644
+    when: bind_installed.stderr.find('No') != -1
+
+  - name: Copy local  /var/named
+    copy:
+      src: var/named
+      dest: /var/
+    when: bind_installed.stderr.find('No') != -1
+
+  - name: Create /var/named/slaves directory
+    file:
+      path: /var/named/slaves
+      state: directory
+      owner: root
+      group: root
+      mode: 0644
+    when: bind_installed.stderr.find('No') != -1
+
+  - name: Change ownership on /etc and /var directories copied over
+    command: chown -Rc named:named /etc/named.conf /var/named /var/log/named
+
+  - name: Give full ownership of named directories to named user
+    command: chmod -R u+rwx /etc/named.conf /var/named /var/log/named
+
+  - name: Registed named service
+    command: chkconfig named on
+    when: bind_installed.stderr.find('No') != -1
+
+  - name: Validate named.conf* files are syntacticly correct
+    command: named-checkconf -z /etc/named.conf
+
+  - name: Start BIND service
+    service:
+      name: named
+      state: restarted
+      enabled: yes
+
+  - name: Reload rndc
+    command: rndc reload

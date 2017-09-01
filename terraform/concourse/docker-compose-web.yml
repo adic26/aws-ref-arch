@@ -1,0 +1,24 @@
+version: '3'
+
+services:
+  concourse-web:
+    image: concourse/concourse:3.4.1
+    command: web
+    ports:
+      - "80:8080"
+      - "2222:2222"
+    volumes: ['./keys/web:/concourse-keys']
+    restart: unless-stopped
+    environment:
+      CONCOURSE_BASIC_AUTH_USERNAME: ${concourse_user}
+      CONCOURSE_BASIC_AUTH_PASSWORD: ${concourse_password}
+      CONCOURSE_POSTGRES_HOST: ${db_host}
+      CONCOURSE_POSTGRES_USER: ${postgres_user}
+      CONCOURSE_POSTGRES_PASSWORD: ${postgres_password}
+      CONCOURSE_POSTGRES_DATABASE: concourse
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: ${aws_region}
+        awslogs-group: ${cloudwatch_log_group_name}
+        tag: concourse-web

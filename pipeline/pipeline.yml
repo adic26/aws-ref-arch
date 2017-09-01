@@ -1,0 +1,136 @@
+groups:
+- name: Test
+  jobs:
+  - canary
+  - stack
+  - mongo
+- name: PuP
+  jobs:
+  - update-pipeline
+
+resources:
+- name: ((repo-name))
+  type: git
+  source:
+    uri: https://github.com/saksdirect/((repo-name)).git
+    paths:
+    - tests/*
+    - terraform/*
+    ignore-paths: [ "*.md", "*.mkd"]
+    branch: ((branch))
+    username: ((git-user))
+    password: ((git-token-password))
+- name: ruby-terraform-mongo
+  type: docker-image
+  source:
+    repository: hbc-docker.jfrog.io/ruby-terraform-mongo
+    tag: latest
+    username: ((artifactory-username))
+    password: ((artifactory-password))
+
+#### PuP resources ####
+- name: ((repo-name))-pipeline
+  type: git
+  source:
+    uri: https://github.com/saksdirect/((repo-name))
+    branch: ((branch))
+    paths:
+      - pipelines/pipeline.yml
+      - variables.yml
+    username: ((git-user))
+    password: ((git-token-password))
+- name: fly
+  type: fly
+  source:
+    url: ((concourse-url))
+    username: ((concourse-username))
+    password: ((concourse-password))
+    team: ((concourse-team))
+
+resource_types:
+- name: fly
+  type: docker-image
+  source:
+    repository: hbc-docker.jfrog.io/concourse-fly-resource
+    username: ((artifactory-username))
+    password: ((artifactory-password))
+    tag: latest
+
+jobs:
+- name: canary
+  serial: true
+  plan:
+  - get: ruby-terraform-mongo
+  - get: ((repo-name))
+    trigger: true
+  - task: Canary Smoke Test
+    image: ruby-terraform-mongo
+    params:
+      AWS_DEFAULT_REGION: ((AWS_Region))
+    file: ((repo-name))/tests/canary/canary-smoke-test.yml
+
+- name: mongo
+  serial: true
+  plan:
+  - get: ruby-terraform-mongo
+  - get: ((repo-name))
+    trigger: true
+  - task: Mongo instance Smoke Test
+    image: ruby-terraform-mongo
+    params:
+      AWS_DEFAULT_REGION: ((AWS_Region))
+    file: ((repo-name))/tests/mongo/mongo-smoke-test.yml
+
+- name: stack
+  serial: true
+  plan:
+  - get: ruby-terraform-mongo
+  - get: ((repo-name))
+    trigger: true
+  - task: Toggle Service with Mongo stack Smoke Test
+    image: ruby-terraform-mongo
+    params:
+      AWS_DEFAULT_REGION: ((AWS_Region))
+    file: ((repo-name))/tests/stack/stack-smoke-test.yml
+
+###########################
+# PuP jobs
+###########################
+
+- name: update-pipeline
+  plan:
+  - get: ((repo-name))-pipeline
+    trigger: true
+
+  - task: fly-create-secrets
+    config:
+      platform: linux
+
+      image_resource:
+        type: docker-image
+        source: { repository: alpine }
+
+      inputs:
+      - name: ((repo-name))-pipeline
+
+      outputs:
+      - name: secrets
+
+      run:
+        path: sh
+        args:
+          - -exc
+          - |
+            cat > secrets/secrets.yml <<EOL
+              git-user: ((git-user))
+              git-token-password: ((git-token-password))
+              artifactory-username: ((artifactory-username))
+              artifactory-password: ((artifactory-password))
+              concourse-username: ((concourse-username))
+              concourse-password: ((concourse-password))
+            EOL
+
+  - put: fly
+    params:
+      command: set-pipeline
+      options: "-n -p ((pipeline-name)) -c ((repo-name))-pipeline/pipeline/pipeline.yml --load-vars-from ((repo-name))-pipeline/pipeline/variables.yml --load-vars-from /tmp/build/put/secrets/secrets.yml -v branch=((branch))"
